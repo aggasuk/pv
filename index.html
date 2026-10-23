@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow"><meta name="referrer" content="no-referrer">
+<title>Notes</title>
+<style>
+  :root{ --bg:#f3f5f4; --panel:#fff; --ink:#14201c; --dim:#5d6d67; --rule:#cfd9d4; --acc:#2b6a93; --neg:#a81b3c; }
+  @media (prefers-color-scheme:dark){ :root{ --bg:#0c1210; --panel:#141c19; --ink:#e4ebe7; --dim:#8ba098; --rule:#2a3833; --acc:#83b3cf; --neg:#ff7089; } }
+  *{ box-sizing:border-box; }
+  body{ margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center; padding:16px;
+        background:var(--bg); color:var(--ink); font:15px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif; }
+  form{ background:var(--panel); border:1px solid var(--rule); border-radius:8px; padding:22px; width:min(360px,100%);
+        display:flex; flex-direction:column; gap:12px; }
+  input[type=password]{ font:inherit; padding:9px 11px; border:1px solid var(--rule); border-radius:6px; background:var(--bg); color:var(--ink); }
+  button{ font:inherit; font-weight:600; padding:9px; border:0; border-radius:6px; background:var(--acc); color:#fff; cursor:pointer; }
+  label{ font-size:13px; color:var(--dim); display:flex; gap:8px; align-items:center; }
+  #err{ color:var(--neg); font-size:13px; min-height:1em; margin:0; }
+</style></head>
+<body>
+<form id="f" autocomplete="off">
+  <input id="p" type="password" placeholder="Passphrase" aria-label="Passphrase" autofocus>
+  <label><input id="r" type="checkbox"> Remember on this device</label>
+  <button type="submit">Open</button>
+  <p id="err" role="alert"></p>
+</form>
+<script>
+var PAYLOAD = {"v": 1, "it": 600000, "s": "K0Av87+CjvzcIUt3b8n6wQ==", "iv": "jMInepyG3q9IS2lT", "ct": "Fz++rCBBsKF7NGnQFMQf/v0gS9w5Z+fEI4HdKvlEEyq0ZeQ+sAPu+2XkNPar55RXA5zRwL1BRSQmaWpWEFudTSA9k3uDPbRNyq10Y27hG7zkQnm4srpYZG9mGTylYEdA4+Bq8I18ktCYDdGSVFhYqb4P7wra1CUCBNsFeKB61zWShsiXJNc/gltLqjBBibsBr3eBi6SHJTWvkd+WF24DsQWzPQ7HZpjEoEOr1p+UvWCWQSrOADe/7p0a5DnRQiD3sCc/E3T+F0Rz1ugIE7hcgvQDJFWD1uu4GuWQNfqN3yQUztbrpkIwNXHxxJnN3oM73yspXdNwKywuaJzdMHtKaXVahfdQqJdBrMmDdgaTp3yiLOZXH+dTVG0Rjn6ISPqn9ysfsTSlKUx26oxXxCLJmZCSfe46hBcFiKJOc6Z/M1COBWdflu3kGMI/TvF2XcLdUn0mJp/Jn+TuDe02AW96yzhN1pOYkOlnlCdj7YPmEKEjem/x8obFi4NvMrgKh26kwGVSs+oSEwYs2Xeglafy4kYyAaNQWCXWZS/jMAaz2KjMD/MwS963WM+yV7OWo1sDJ3/ilK/jwQJMwM7fRjxohc1zzpXScGiyPC7ncLTIvCArILsV5bcYryxwNUs5qYqf74hf4zeeheyKcN6H92WxU9QZR8T1pv/3sooFzbVXXoU4/ryTQqPdYWD/fxddlU3OYtXJFzGOIf3wPpbFNJkUm0eAJ36+1NE0p03IcX0rBWHEUyZXNQMPaf3MW5arxTsgrWEIGcmVCKpXNnz61WeaAUQLXVZne34bcXRaKss7xqTT6qpwRvS4oeSCTQR2QmUzRE4kNmiWpMu4gXF27mSEJII/MfN1GKCY8AaJe23UiaOJgxhqek0hgIsjkA1HqYYx9CEjEB5JNxtPkvItAh0DWvXkF3OPohbDrsAGfrt677amGIWYnG/Q5UOSZdN+n4AE2dPc1VeIAgEPCpLh0r6tlkQRJwYoWfYol3hkbAaYYNsTFrlTb6X0GUFSgA=="};
+(function(){
+  var K = "pv_pass";
+  function b(s){ return Uint8Array.from(atob(s), function(c){ return c.charCodeAt(0); }); }
+  function get(){ try { return sessionStorage.getItem(K) || localStorage.getItem(K); } catch(e){ return null; } }
+  async function open(pw, remember){
+    var km = await crypto.subtle.importKey("raw", new TextEncoder().encode(pw), "PBKDF2", false, ["deriveKey"]);
+    var key = await crypto.subtle.deriveKey({name:"PBKDF2", salt:b(PAYLOAD.s), iterations:PAYLOAD.it, hash:"SHA-256"},
+                                            km, {name:"AES-GCM", length:256}, false, ["decrypt"]);
+    var gz = await crypto.subtle.decrypt({name:"AES-GCM", iv:b(PAYLOAD.iv)}, key, b(PAYLOAD.ct));
+    var html = await new Response(new Blob([gz]).stream().pipeThrough(new DecompressionStream("gzip"))).text();
+    try { sessionStorage.setItem(K, pw); if (remember) localStorage.setItem(K, pw); } catch(e){}
+    document.open(); document.write(html); document.close();
+  }
+  var saved = get();
+  if (saved) open(saved, false).catch(function(){ try { sessionStorage.removeItem(K); localStorage.removeItem(K); } catch(e){} });
+  document.getElementById("f").addEventListener("submit", function(ev){
+    ev.preventDefault();
+    var pw = document.getElementById("p").value, err = document.getElementById("err");
+    err.textContent = "";
+    if (!(window.crypto && crypto.subtle) || typeof DecompressionStream === "undefined") {
+      err.textContent = "This browser can't decrypt here (needs https and a current Chrome/Edge/Firefox).";
+      return;
+    }
+    open(pw, document.getElementById("r").checked).catch(function(){ err.textContent = "Wrong passphrase."; });
+  });
+})();
+</script>
+</body></html>
